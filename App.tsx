@@ -6,6 +6,7 @@ import {
   View,
   TouchableOpacity,
   Easing,
+  Image,
 } from 'react-native';
 import GestureRecognizer from 'react-native-swipe-gestures';
 import {
@@ -22,10 +23,36 @@ const App = () => {
     moveAnimation: any;
   }
 
+  let images = Object.fromEntries([
+    ['fire', require('./images/fire.png')],
+    ['water', require('./images/water.png')],
+  ]);
+
   const ElementView = (props: any) => {
     return (
       <View style={{position: 'absolute'}}>
         <Animated.View style={[props.item.moveAnimation.getLayout()]}>
+          <View
+            style={{
+              backgroundColor: '#eee4da',
+              margin: wp('1.2%'),
+              width: wp('22%'),
+              height: wp('22%'),
+            }}>
+            <Image
+              source={images.water}
+              style={{width: '100%', height: '100%'}}
+            />
+          </View>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  const ElementView2 = (props: any) => {
+    return (
+      <View style={{position: 'absolute'}}>
+        <Animated.View style={animatedStyles}>
           <View
             style={{
               backgroundColor: 'grey',
@@ -159,9 +186,12 @@ const App = () => {
         break;
 
       case 'LEFT':
+        // calculate new spots
         updatedBoard = rows.map((row: Array<Array<Element | null>>) => {
           return [...row, ...Array(4 - row.length).fill(null)];
         });
+        // check for collisions for elements to the left
+        // for each row from left to right, if the element to the right is the same id and it is not currently colliding, set it and self to collide and to the left element coords, mark second element to delete, mark first element to upgrade
         break;
       case 'RIGHT':
         updatedBoard = rows.map((row: Array<Array<Element | null>>) => {
@@ -234,7 +264,7 @@ const App = () => {
   let a = Animated.timing(width, {
     toValue: endWidth,
     useNativeDriver: false,
-    duration: 200,
+    duration: 50,
     easing: Easing.linear,
   });
   let opacity = new Animated.Value(0);
@@ -250,15 +280,15 @@ const App = () => {
   };
 
   const size = opacity.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 120],
+    inputRange: [0, 2],
+    outputRange: [0, 100],
   });
+
   const animatedStyles = [
-    styles.box,
     {
-      // opacity,
+      opacity,
       width: size,
-      height: size,
+      height: 111,
     },
   ];
   return (
@@ -281,13 +311,24 @@ const App = () => {
             })}
           </View>
         </View>
-        <TouchableOpacity
-          onPress={() => animate(Easing.elastic(2))}
-          style={{position: 'absolute'}}>
-          <View style={styles.boxContainer}>
-            <Animated.View style={animatedStyles} />
-          </View>
-        </TouchableOpacity>
+        <View style={styles.container}>
+          <TouchableOpacity onPress={() => animate(Easing.bounce)}>
+            <View style={styles.boxContainer}>
+              <ElementView2
+                item={{
+                  id: 'fire',
+                  combinesWith: ['fire'],
+                  value: 2,
+                  position: {x: 0, y: 0},
+                  moveAnimation: new Animated.ValueXY({
+                    x: 0,
+                    y: 0,
+                  }),
+                }}
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
     </GestureRecognizer>
   );
@@ -298,20 +339,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: wp('1.2%'),
     paddingVertical: wp('1.2%'),
-    marginVertical: wp('50%'),
+    marginVertical: wp('25%'),
     backgroundColor: '#bbada0',
   },
   box: {
     marginTop: 32,
     borderRadius: 4,
-    backgroundColor: '#61dafb',
+    backgroundColor: '#cdc1b4',
   },
   boxContainer: {
     height: 160,
     alignItems: 'center',
   },
   item: {
-    backgroundColor: '#cdc0b4',
+    backgroundColor: '#cdc1b4',
     marginHorizontal: wp('1.2%'),
     marginVertical: wp('1.2%'),
     height: wp('22%'),
