@@ -1,4 +1,4 @@
-import React, {useRef} from 'react';
+import React, {useRef, useState, useEffect} from 'react';
 import {
   Animated,
   FlatList,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Easing,
   Image,
+  Button,
 } from 'react-native';
 import GestureRecognizer from 'react-native-swipe-gestures';
 import {
@@ -14,13 +15,26 @@ import {
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 
+// check for collisions based on swipe direction
+// mark upgrade to based on collision, mark other for deletion
+// perform swipe to same target xy
+// delete entities, upgrade entities
+
+// swipe left
+// put everything into a queue
+// pop first item
+// can second item collide? no - put first back, yes - collide and put first into result, ignore second.
+// third is null, fourth can slide over null, pop next actual item, then fill end with x slots null which is 2 for this scenario
+
 const App = () => {
   interface Element {
     id: String;
-    combinesWith: Array<String>;
     value: number;
+    collidesWith: Array<String>;
     position: {x: number; y: number};
     moveAnimation: any;
+    colliding: boolean;
+    upgrade: {id: String; delete: boolean};
   }
 
   let images = Object.fromEntries([
@@ -40,7 +54,7 @@ const App = () => {
               height: wp('22%'),
             }}>
             <Image
-              source={images.water}
+              source={images[props.item.id]}
               style={{width: '100%', height: '100%'}}
             />
           </View>
@@ -70,49 +84,75 @@ const App = () => {
     return <View style={styles.item} />;
   };
 
-  let state = Array<Element | null>(16).fill(null);
+  let [state, setState] = useState(Array<Element | null>(16).fill(null));
 
-  state[0] = {
-    id: 'water',
-    combinesWith: ['water', 'ice'],
-    value: 2,
-    position: {x: 0, y: 0},
-    moveAnimation: new Animated.ValueXY({
-      x: wp('1.2%') + wp('24.4%') * 0,
-      y: wp('1.2%') + wp('24.4%') * 0,
-    }),
-  };
-  state[3] = {
-    id: 'water',
-    combinesWith: ['water', 'ice'],
-    value: 2,
-    position: {x: 0, y: 1},
-    moveAnimation: new Animated.ValueXY({
-      x: wp('1.2%') + wp('24.4%') * 1,
-      y: wp('1.2%') + wp('24.4%') * 0,
-    }),
-  };
-  state[1] = {
-    id: 'fire',
-    combinesWith: ['fire'],
-    value: 2,
-    position: {x: 2, y: 2},
-    moveAnimation: new Animated.ValueXY({
-      x: wp('1.2%') + wp('24.4%') * 2,
-      y: wp('1.2%') + wp('24.4%') * 2,
-    }),
-  };
+  useEffect(() => {
+    let temp_state = Array<Element | null>(16).fill(null);
 
-  state[6] = {
-    id: 'fire',
-    combinesWith: ['fire'],
-    value: 2,
-    position: {x: 3, y: 3},
-    moveAnimation: new Animated.ValueXY({
-      x: wp('1.2%') + wp('24.4%') * 3,
-      y: wp('1.2%') + wp('24.4%') * 3,
-    }),
-  };
+    temp_state[0] = {
+      id: 'water',
+      collidesWith: ['water', 'ice'],
+      value: 2,
+      position: {x: 0, y: 0},
+      moveAnimation: new Animated.ValueXY({
+        x: wp('1.2%') + wp('24.4%') * 0,
+        y: wp('1.2%') + wp('24.4%') * 0,
+      }),
+      colliding: false,
+      upgrade: {id: 'fire', delete: false},
+    };
+    temp_state[1] = {
+      id: 'fire',
+      collidesWith: ['fire', 'ice'],
+      value: 2,
+      position: {x: 3, y: 3},
+      moveAnimation: new Animated.ValueXY({
+        x: wp('1.2%') + wp('24.4%') * 3,
+        y: wp('1.2%') + wp('24.4%') * 3,
+      }),
+      colliding: false,
+      upgrade: {id: 'fire', delete: false},
+    };
+    temp_state[3] = {
+      id: 'water',
+      collidesWith: ['water', 'ice'],
+      value: 2,
+      position: {x: 0, y: 1},
+      moveAnimation: new Animated.ValueXY({
+        x: wp('1.2%') + wp('24.4%') * 1,
+        y: wp('1.2%') + wp('24.4%') * 0,
+      }),
+      colliding: false,
+      upgrade: {id: 'fire', delete: false},
+    };
+    setState(temp_state);
+  }, []);
+
+  // state[1] = {
+  //   id: 'fire',
+  //   collidesWith: ['fire'],
+  //   value: 2,
+  //   position: {x: 2, y: 2},
+  //   moveAnimation: new Animated.ValueXY({
+  //     x: wp('1.2%') + wp('24.4%') * 2,
+  //     y: wp('1.2%') + wp('24.4%') * 2,
+  //   }),
+  //   colliding: false,
+  //   upgrade: {id: 'water', delete: false},
+  // };
+
+  // state[6] = {
+  //   id: 'fire',
+  //   collidesWith: ['fire'],
+  //   value: 2,
+  //   position: {x: 3, y: 3},
+  //   moveAnimation: new Animated.ValueXY({
+  //     x: wp('1.2%') + wp('24.4%') * 3,
+  //     y: wp('1.2%') + wp('24.4%') * 3,
+  //   }),
+  //   colliding: false,
+  //   upgrade: {id: 'water', delete: false},
+  // };
 
   /**
    * Invert an array - used for vertical reallignment
@@ -186,12 +226,17 @@ const App = () => {
         break;
 
       case 'LEFT':
+        // console.log('left?');
         // calculate new spots
         updatedBoard = rows.map((row: Array<Array<Element | null>>) => {
           return [...row, ...Array(4 - row.length).fill(null)];
         });
+
+        // whiteboard
+
         // check for collisions for elements to the left
-        // for each row from left to right, if the element to the right is the same id and it is not currently colliding, set it and self to collide and to the left element coords, mark second element to delete, mark first element to upgrade
+        // for each row from left to right, if the element to the right is the same id and it is not currently colliding,
+        // set it and self to collide and to the left element coords, mark second element to delete, mark first element to upgrade
         break;
       case 'RIGHT':
         updatedBoard = rows.map((row: Array<Array<Element | null>>) => {
@@ -203,27 +248,54 @@ const App = () => {
         break;
     }
 
+    // console.error(updatedBoard[0][0]);
+
     if (updatedBoard !== null) {
       for (let y = 0; y < updatedBoard.length; y++) {
         for (let x = 0; x < updatedBoard.length; x++) {
           if (updatedBoard[x][y] !== null && updatedBoard[x][y] !== undefined) {
-            updatedBoard[x][y].position = {x: x, y: y};
+            if (!updatedBoard[x][y]?.colliding) {
+              updatedBoard[x][y]!.position = {x: x, y: y};
+            } else {
+              // is colliding
+              if (updatedBoard[x][y]!.upgrade.delete === true) {
+                // updatedBoard[x][y] = null;
+                // console.log(state);
+                // colliding and upgrading
+              } else {
+                updatedBoard[x][y]!.colliding = false;
+                updatedBoard[x][y]!.id = 'water';
+                updatedBoard[x][y]!.upgrade = {id: 'fire', delete: false};
+              }
+            }
           }
         }
       }
     }
 
-    state = [
+    let temp_state = [
       ...updatedBoard[0],
       ...updatedBoard[1],
       ...updatedBoard[2],
       ...updatedBoard[3],
     ];
 
+    let nullCount = 0;
+
+    state.forEach((item: any) => {
+      if (item === null) {
+        nullCount = nullCount + 1;
+      }
+    });
+
+    // console.error(state);
+
     let animationQueue: Animated.CompositeAnimation[] = [];
 
-    state.forEach((item: Element | null, index: number) => {
+    // console.error(state);
+    temp_state.forEach((item: Element | null, index: number) => {
       if (item) {
+        state;
         animationQueue.push(
           Animated.timing(item.moveAnimation, {
             toValue: {
@@ -240,6 +312,8 @@ const App = () => {
 
     // Start all tile moves at the same time
     Animated.parallel(animationQueue).start();
+
+    setState(temp_state);
   };
 
   const handleSwipe = (direction: string) => {
@@ -301,7 +375,7 @@ const App = () => {
               data={Array(16).fill('')}
               numColumns={4}
               renderItem={({item}) => <BackgroundTile />}
-              keyExtractor={(item) => item.title}
+              keyExtractor={(item) => Math.random().toString()}
               decelerationRate={0.798}
               showsHorizontalScrollIndicator={false}
             />
@@ -310,14 +384,20 @@ const App = () => {
               return item !== null ? <ElementView item={item} /> : null;
             })}
           </View>
+          <Button
+            title={'Clear state'}
+            onPress={() => {
+              setState(Array<Element | null>(16).fill(null));
+            }}
+          />
         </View>
-        <View style={styles.container}>
+        {/* <View style={styles.container}>
           <TouchableOpacity onPress={() => animate(Easing.bounce)}>
             <View style={styles.boxContainer}>
               <ElementView2
                 item={{
                   id: 'fire',
-                  combinesWith: ['fire'],
+                  collidesWith: ['fire'],
                   value: 2,
                   position: {x: 0, y: 0},
                   moveAnimation: new Animated.ValueXY({
@@ -328,7 +408,7 @@ const App = () => {
               />
             </View>
           </TouchableOpacity>
-        </View>
+        </View> */}
       </View>
     </GestureRecognizer>
   );
